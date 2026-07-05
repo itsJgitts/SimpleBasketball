@@ -15,7 +15,9 @@ import { clamp, round } from './util.js';
 
 const teamById = (game, tid) => game.teams.find((t) => t.tid === tid);
 export function playersOnTeam(game, tid) { return game.players.filter((p) => p.tid === tid); }
-export function freeAgents(game) { return game.players.filter((p) => p.tid === -1); }
+// Signable free agents: tid -1 and NOT an undrafted prospect (prospects wait in
+// the pool until their draft year and enter the league via the draft).
+export function freeAgents(game) { return game.players.filter((p) => p.tid === -1 && !p.isProspect); }
 export function teamPayroll(game, tid) {
   return playersOnTeam(game, tid).reduce((s, p) => s + (p.contract ? p.contract.amount : 0), 0);
 }
@@ -69,7 +71,7 @@ export function projectedPayroll(game, tid, addAmount = 0) {
 export function signFreeAgent(game, pid, tid, contract) {
   const player = game.players.find((p) => p.pid === pid);
   if (!player) throw new Error('Unknown player.');
-  if (player.tid !== -1) throw new Error(`${player.name} is not a free agent.`);
+  if (player.tid !== -1 || player.isProspect) throw new Error(`${player.name} is not a free agent.`);
   if (!canAddPlayer(game, tid)) throw new Error(`Roster is full (max ${CONFIG.ROSTER_MAX}).`);
   const deal = contract || contractDemand(game, player, tid);
   player.tid = tid;

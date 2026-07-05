@@ -52,11 +52,18 @@ function shift(prev, step, R) {
   return row;
 }
 
-// Generate the draft class as free-agent players (tid -1 until drafted) whose
-// ceiling scales with intended slot: early picks are stronger + higher-pot.
-export function generateDraftClass(game, R) {
+// Real draft prospects loaded from the roster file for the current season:
+// waiting free agents (tid -1) flagged isProspect whose draft year is now.
+export function realProspects(game) {
+  return game.players.filter((p) => p.tid === -1 && p.isProspect && p.draft && p.draft.year === game.season);
+}
+
+// Generate `count` synthetic prospects (tid -1 until drafted) whose ceiling
+// scales with intended slot: earlier synthetic picks are stronger + higher-pot.
+// Used to fill any shortfall when the file has too few real prospects.
+export function generateDraftClass(game, R, count) {
   const nTeams = game.teams.length;
-  const total = CONFIG.DRAFT_ROUNDS * nTeams;
+  const total = count != null ? count : CONFIG.DRAFT_ROUNDS * nTeams;
   const season = game.season;
   const prospects = [];
   for (let i = 0; i < total; i++) {
@@ -121,11 +128,17 @@ export function draftOrder(game, R, playoffTids) {
   return order;
 }
 
-// Set up the draft: generate the class and compute the order. Stores on game.
+// Set up the draft and compute the order. Prefers the real draft class loaded
+// from the roster file for this season; if the file has fewer prospects than
+// there are picks (or none — e.g. seasons past the file's draft classes), the
+// remainder is filled with generated rookies. Stores on game.
 export function setupDraft(game, R, playoffTids) {
-  const prospects = generateDraftClass(game, R);
-  game.players.push(...prospects);
   const order = draftOrder(game, R, playoffTids);
+  const real = realProspects(game).sort((a, b) => b.pot - a.pot || b.ovr - a.ovr);
+  const shortfall = Math.max(0, order.length - real.length);
+  const generated = generateDraftClass(game, R, shortfall);
+  game.players.push(...generated);
+  const prospects = [...real, ...generated];
   game.draftClass = { season: game.season, order, prospects: prospects.map((p) => p.pid), picks: [], onClock: 0 };
   game.phase = 'draft';
   return game.draftClass;
@@ -160,6 +173,9 @@ export function makePick(game, pid) {
   player.tid = slot.tid;
   player.draft = { round: slot.round, pick: slot.pick, year: game.season, tid: slot.tid, originalTid: slot.tid };
   player.isProspect = false;
+  // Stamp a rookie-scale contract if the prospect arrived without one (real
+  // file prospects carry no contract until drafted).
+  if (!player.contract) player.contract = { amount: CONFIG.MIN_SALARY, exp: game.season + 3 };
   const team = game.teams.find((t) => t.tid === slot.tid);
   if (team) team.lineup = autoLineup(game.players.filter((p) => p.tid === slot.tid), game.season);
   game.draftClass.picks.push({ overall: slot.overall, round: slot.round, pick: slot.pick, tid: slot.tid, pid });

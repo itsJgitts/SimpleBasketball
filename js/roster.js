@@ -16,6 +16,27 @@ function pronenessFromPid(pid) {
   return 1 / spread + r * (spread - 1 / spread);
 }
 
+// Map the BBGM per-season stat rows onto our accumulator shape so the career
+// modal can show real history. BBGM stores rebounds split as orb+drb and totals
+// per season; we keep season totals (the modal divides by gp for per-game).
+function mapStats(rawStats) {
+  return (rawStats || [])
+    .filter((s) => s && s.gp > 0)
+    .map((s) => ({
+      season: s.season,
+      playoffs: !!s.playoffs,
+      tid: s.tid,
+      gp: s.gp || 0,
+      min: s.min || 0,
+      pts: s.pts || 0,
+      reb: (s.orb || 0) + (s.drb || 0),
+      ast: s.ast || 0,
+      stl: s.stl || 0,
+      blk: s.blk || 0,
+      tov: s.tov || 0,
+    }));
+}
+
 function normalizePlayer(raw, pid, season) {
   const name = raw.name || `${raw.firstName || ''} ${raw.lastName || ''}`.trim() || 'Unknown';
   const contract = raw.contract && raw.contract.amount
@@ -34,7 +55,7 @@ function normalizePlayer(raw, pid, season) {
     contract,
     injury: raw.injury && raw.injury.type ? { type: raw.injury.type, gamesRemaining: raw.injury.gamesRemaining || 0 } : { type: 'Healthy', gamesRemaining: 0 },
     injuryProneness: pronenessFromPid(pid),
-    stats: [], // our own per-season accumulators (see sim.js)
+    stats: mapStats(raw.stats), // real history from the file; sim appends to it
   };
   refreshPlayer(p, season);
   if (!p.contract) {
@@ -72,13 +93,25 @@ export function parseLeagueFile(fileObj, seed) {
   for (const p of fileObj.players) if (p.tid >= 0) tidCounts[p.tid] = (tidCounts[p.tid] || 0) + 1;
   const activeTids = new Set(Object.keys(tidCounts).map(Number));
 
-  // Normalize players: keep active + free agents (tid -1); drop retired (<=-2).
+  // Normalize players: keep active rostered players, free agents (tid -1), and
+  // future draft prospects (BBGM tid -2 with a draft year >= this season). Drop
+  // retired players (tid -3) and any deeper negative sentinel.
   const players = [];
   let pid = 0;
   for (const raw of fileObj.players) {
-    if (raw.tid <= -2) continue;
+    const isProspect = raw.tid === -2 && raw.draft && raw.draft.year >= season;
+    if (raw.tid <= -2 && !isProspect) continue; // retired / unusable
     if (raw.tid >= 0 && !activeTids.has(raw.tid)) continue;
-    players.push(normalizePlayer(raw, pid++, season));
+    const p = normalizePlayer(raw, pid++, season);
+    if (isProspect) {
+      // Prospects wait in the pool as free agents (tid -1) but are flagged so
+      // they stay out of free agency until their draft year (see draft.js).
+      p.tid = -1;
+      p.isProspect = true;
+      p.draft = { ...p.draft, year: raw.draft.year };
+      p.contract = null;
+    }
+    players.push(p);
   }
   trimRosters(players);
 

@@ -40,7 +40,7 @@ function expireContracts(game) {
 // the number of signings made across the league.
 function fillRosters(game) {
   const freeAgentPool = () => game.players
-    .filter((p) => p.tid === -1)
+    .filter((p) => p.tid === -1 && !p.isProspect)
     .sort((a, b) => b.ovr - a.ovr);
   let signings = 0;
   for (const t of game.teams) {
@@ -61,6 +61,11 @@ function fillRosters(game) {
 export function startNextSeason(game, R) {
   const prevSeason = game.season;
   const released = expireContracts(game);
+  // Draft prospects whose draft year has passed but who went undrafted become
+  // ordinary free agents (available to sign) rather than staying in limbo.
+  for (const p of game.players) {
+    if (p.isProspect && p.draft && p.draft.year <= prevSeason) p.isProspect = false;
+  }
   game.season += 1;
 
   // Age & develop everyone (young rise, old decline) into the new season.
