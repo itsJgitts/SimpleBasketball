@@ -35,9 +35,23 @@ export const CONFIG = {
   BASE_ORTG: 113,            // points per 100 possessions baseline
   ORTG_PER_POWER: 0.35,      // how much a point of power rating shifts ORtg
   SCORE_STDDEV: 9,           // stddev of final-score noise per team
-  LEAGUE_AVG_POWER: 55,      // reference power rating (~ league-average ovr)
+  LEAGUE_AVG_POWER: 61,      // reference power rating (~ league-average rescaled ovr)
   SCORE_POINTS_PER_POWER: 0.6, // points added per power point above league avg
-  REPLACEMENT_OVR: 38,       // ovr used to fill minutes lost to injury
+  REPLACEMENT_OVR: 46,       // ovr (rescaled scale) used to fill minutes lost to injury
+  // Overall-rating rescale: the raw BBGM ovr formula clusters players in the
+  // ~40s–70s. These piecewise-linear anchors stretch that onto a wider curve so
+  // MVP/stars reach the mid-90s while role players stay in the 50s–60s. Input =
+  // raw computeOvr, output = displayed ovr. Values outside the range extrapolate
+  // linearly off the nearest segment (then clamp 0..99).
+  OVR_RESCALE_ANCHORS: [
+    { in: 39, out: 48 },
+    { in: 50, out: 54 },
+    { in: 55, out: 58 },
+    { in: 60, out: 65 },
+    { in: 65, out: 75 },
+    { in: 70, out: 85 },
+    { in: 76, out: 95 },
+  ],
   // Team-total stat means used to sample & distribute a box score.
   TEAM_REB_MEAN: 44, TEAM_REB_STD: 5,
   TEAM_AST_MEAN: 25, TEAM_AST_STD: 4,

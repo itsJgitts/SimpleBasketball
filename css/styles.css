@@ -47,6 +47,7 @@ p { margin: 0.3rem 0; }
 a { color: var(--fg); }
 .dim { color: var(--dim); }
 .center { text-align: center; }
+.warn { border: 2px solid var(--border); padding: 0.2rem 0.4rem; font-weight: 700; display: inline-block; }
 
 /* ---- Buttons / tap targets ------------------------------------------------*/
 button, .btn {
@@ -83,6 +84,8 @@ th.sortable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 th.sortable:active { background: var(--fg); color: var(--bg); }
 th.sorted { text-decoration: underline; }
 .sort-ind { font-size: var(--fs-sm); }
+.player-link { text-decoration: underline dotted; text-underline-offset: 2px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.player-link:active { background: var(--fg); color: var(--bg); }
 
 /* ---- Panels / cards -------------------------------------------------------*/
 .panel { border: 2px solid var(--border); padding: 0.6rem; margin: var(--gap) 0; }

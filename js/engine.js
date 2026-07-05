@@ -16,12 +16,15 @@ function indexGame(game) {
   return { teamsById, playersById };
 }
 
-// Get (or create) a player's stat accumulator row for a season.
-function statRow(player, season) {
+// Get (or create) a player's stat accumulator row for a season. `tid` is the
+// team the player is on this season, recorded so career history can show it.
+function statRow(player, season, tid) {
   let row = player.stats.find((s) => s.season === season && !s.playoffs);
   if (!row) {
-    row = { season, playoffs: false, gp: 0, min: 0, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0 };
+    row = { season, playoffs: false, tid, gp: 0, min: 0, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0 };
     player.stats.push(row);
+  } else if (row.tid === undefined) {
+    row.tid = tid;
   }
   return row;
 }
@@ -31,7 +34,7 @@ function accumulateBox(box, playersById, season) {
   for (const line of box) {
     const p = playersById[line.pid];
     if (!p) continue;
-    const row = statRow(p, season);
+    const row = statRow(p, season, p.tid);
     row.gp += 1; row.min += line.min; row.pts += line.pts; row.reb += line.reb;
     row.ast += line.ast; row.stl += line.stl; row.blk += line.blk; row.tov += line.tov;
   }

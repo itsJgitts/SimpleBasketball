@@ -10,7 +10,7 @@ import {
   rankedFreeAgents, contractDemand, signFreeAgent, canAddPlayer,
   isExtensionEligible, extensionEligibleCount, extensionDemand, extendPlayer,
 } from '../freeagency.js';
-import { registerScreen, navigate, reRender, toast, h2, table, btn, btnRow, panel, openModal, closeModal, confirmModal } from './dom.js';
+import { registerScreen, navigate, reRender, toast, h2, table, btn, btnRow, panel, openModal, closeModal, confirmModal, playerName } from './dom.js';
 
 function trySign(pid) {
   const g = store.game;
@@ -64,7 +64,7 @@ registerScreen('freeagency', {
     const myElig = playersOnTeam(g.userTid).filter((p) => isExtensionEligible(g, p)).sort((a, b) => b.ovr - a.ovr);
     if (myElig.length) {
       wrap.append(el('h3', { text: `Extensions (${myElig.length})` }));
-      const rows = myElig.map((p) => [p.name, p.pos, p.ovr, money(p.contract.amount), p.contract.exp]);
+      const rows = myElig.map((p) => [playerName(p.pid, p.name), p.pos, p.ovr, money(p.contract.amount), p.contract.exp]);
       wrap.append(table(['Player', 'Pos', 'Ovr', 'Salary', 'Exp'], rows, {
         onRow: (i) => tryExtend(myElig[i].pid),
         sortable: true,
@@ -78,7 +78,7 @@ registerScreen('freeagency', {
     const demands = fas.map((p) => contractDemand(g, p, g.userTid));
     const rows = fas.map((p, i) => {
       const d = demands[i];
-      return [p.name, p.pos, p.ovr, p.pot, p.age, `${money(d.amount)}×${d.years}`];
+      return [playerName(p.pid, p.name), p.pos, p.ovr, p.pot, p.age, `${money(d.amount)}×${d.years}`];
     });
     wrap.append(table(['Player', 'Pos', 'Ovr', 'Pot', 'Age', 'Asks'], rows, {
       onRow: (i) => trySign(fas[i].pid),

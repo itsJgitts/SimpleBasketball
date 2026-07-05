@@ -4,7 +4,7 @@
 // =============================================================================
 import { el } from '../util.js';
 import { store } from '../state.js';
-import { registerScreen, navigate, h2, table, btn, btnRow, openModal, closeModal } from './dom.js';
+import { registerScreen, navigate, h2, table, btn, btnRow, openModal, closeModal, playerName } from './dom.js';
 
 const teamById = (g, tid) => g.teams.find((t) => t.tid === tid);
 
@@ -12,7 +12,7 @@ function boxTable(title, box) {
   const rows = box
     .slice()
     .sort((a, b) => b.pts - a.pts)
-    .map((l) => [l.name, l.pos, l.min, l.pts, l.reb, l.ast, l.stl, l.blk, l.tov]);
+    .map((l) => [playerName(l.pid, l.name, { linkClick: true }), l.pos, l.min, l.pts, l.reb, l.ast, l.stl, l.blk, l.tov]);
   return el('div', {}, el('h3', { text: title }),
     table(['Player', 'Pos', 'Min', 'Pts', 'Reb', 'Ast', 'Stl', 'Blk', 'Tov'], rows));
 }

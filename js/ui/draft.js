@@ -10,7 +10,7 @@ import {
   setupDraft, availableProspects, currentPick, makePick, autoDraftUntil, autoPick,
 } from '../draft.js';
 import { startNextSeason, playoffTids } from '../season.js';
-import { registerScreen, navigate, reRender, toast, h2, table, btn, btnRow, panel } from './dom.js';
+import { registerScreen, navigate, reRender, toast, h2, table, btn, btnRow, panel, playerName } from './dom.js';
 
 function coinFn(a, b) { return ((a.tid + b.tid) % 2 === 0) ? -1 : 1; }
 const teamById = (g, tid) => g.teams.find((t) => t.tid === tid);
@@ -64,7 +64,7 @@ registerScreen('draft', {
 
     // Board of available prospects (top 40).
     const avail = availableProspects(g).slice(0, 40);
-    const rows = avail.map((p) => [p.name, p.pos, p.ovr, p.pot, p.age]);
+    const rows = avail.map((p) => [playerName(p.pid, p.name), p.pos, p.ovr, p.pot, p.age]);
     wrap.append(el('h3', { text: 'Best Available' }));
     wrap.append(table(['Prospect', 'Pos', 'Ovr', 'Pot', 'Age'], rows, {
       onRow: (i) => {

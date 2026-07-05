@@ -5,7 +5,31 @@
 import CONFIG from './config.js';
 import { clamp, round } from './util.js';
 
-// BBGM's official basketball ovr formula (component ratings -> 0..100).
+// Map a raw BBGM ovr onto the wider display curve (see OVR_RESCALE_ANCHORS).
+// Piecewise-linear between anchors; linear extrapolation beyond the ends.
+export function rescaleOvr(raw) {
+  const a = CONFIG.OVR_RESCALE_ANCHORS;
+  if (!a || a.length < 2) return clamp(Math.round(raw), 0, 99);
+  if (raw <= a[0].in) {
+    const s = (a[1].out - a[0].out) / (a[1].in - a[0].in);
+    return clamp(Math.round(a[0].out + (raw - a[0].in) * s), 0, 99);
+  }
+  const last = a.length - 1;
+  if (raw >= a[last].in) {
+    const s = (a[last].out - a[last - 1].out) / (a[last].in - a[last - 1].in);
+    return clamp(Math.round(a[last].out + (raw - a[last].in) * s), 0, 99);
+  }
+  for (let i = 1; i < a.length; i++) {
+    if (raw <= a[i].in) {
+      const t = (raw - a[i - 1].in) / (a[i].in - a[i - 1].in);
+      return clamp(Math.round(a[i - 1].out + t * (a[i].out - a[i - 1].out)), 0, 99);
+    }
+  }
+  return clamp(Math.round(raw), 0, 99);
+}
+
+// BBGM's official basketball ovr formula (component ratings -> raw), then our
+// rescale so ratings span a wider MVP..role-player range.
 export function computeOvr(r) {
   let x =
     0.159 * (r.hgt - 47.5) + 0.0777 * (r.stre - 50.2) + 0.123 * (r.spd - 50.8) +
@@ -19,7 +43,8 @@ export function computeOvr(r) {
   else if (x >= 42) f = -5 + (x - 42) * (9 / 8);
   else if (x >= 31) f = -5 - (42 - x) * (5 / 11);
   else f = -10;
-  return clamp(Math.round(x + f), 0, 100);
+  const raw = x + f;
+  return rescaleOvr(raw);
 }
 
 // Estimate potential ceiling from current ovr + age. Young players get upside;

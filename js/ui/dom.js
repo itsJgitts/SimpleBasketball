@@ -4,7 +4,7 @@
 // and are shown via navigate(); each renderer returns a DOM node for #screen.
 // =============================================================================
 import { $, el, esc } from '../util.js';
-import { store, saveToLocal } from '../state.js';
+import { store, saveToLocal, teamById, playerById } from '../state.js';
 
 // Registered screens: name -> ({ nav?, render }) . nav entries appear in drawer.
 const SCREENS = {};
@@ -180,5 +180,63 @@ export function confirmModal(message, { okText = 'Confirm', cancelText = 'Cancel
         btn(cancelText, () => { closeModal(); resolve(false); })));
     openModal(box);
   });
+}
+
+// ---- Player career modal ---------------------------------------------------
+// Team label for a stat-row tid (—: none/free agent, ???: unknown historic tid).
+function teamLabel(tid) {
+  if (tid === undefined || tid === null) return '—';
+  if (tid === -1) return 'FA';
+  const t = teamById(tid);
+  return t ? t.abbrev : '???';
+}
+
+// Per-game average, blank when no games played.
+const per = (v, gp) => (gp > 0 ? (v / gp).toFixed(1) : '—');
+
+// Show a modal with a player's per-season stats and the team for each season.
+export function playerModal(pid) {
+  const p = playerById(pid);
+  if (!p) return;
+  const box = el('div', {}, el('h3', { text: p.name }),
+    el('p', { class: 'small dim', text: `${p.pos} · ovr ${p.ovr} · pot ${p.pot} · age ${p.age}` }));
+
+  const seasons = (p.stats || []).filter((s) => !s.playoffs).slice().sort((a, b) => a.season - b.season);
+  if (!seasons.length) {
+    box.append(el('p', { class: 'dim', text: 'No games played yet.' }));
+  } else {
+    const rows = seasons.map((s) => [
+      s.season, teamLabel(s.tid), s.gp,
+      per(s.min, s.gp), per(s.pts, s.gp), per(s.reb, s.gp),
+      per(s.ast, s.gp), per(s.stl, s.gp), per(s.blk, s.gp), per(s.tov, s.gp),
+    ]);
+    box.append(table(['Yr', 'Tm', 'GP', 'Min', 'Pts', 'Reb', 'Ast', 'Stl', 'Blk', 'Tov'], rows, {
+      sortable: true,
+    }));
+    box.append(el('p', { class: 'small dim', text: 'Per-game averages. Tap a header to sort.' }));
+  }
+  box.append(btn('Close', closeModal));
+  openModal(box);
+}
+
+// A player-name node that opens the career modal on long-press (touch) or
+// right-click (desktop). `label` overrides the displayed text (e.g. a ✓ prefix).
+// Pass { linkClick: true } on screens with no row action to also open on tap.
+export function playerName(pid, label, { linkClick = false } = {}) {
+  const node = el('span', { class: 'player-link', text: label != null ? label : (playerById(pid) || {}).name || '' });
+  const open = (e) => { if (e) { e.preventDefault(); e.stopPropagation(); } playerModal(pid); };
+  // Desktop: right-click always opens the career modal.
+  node.addEventListener('contextmenu', open);
+  if (linkClick) node.addEventListener('click', open);
+  // Touch long-press: fire after 450ms; a fired long-press suppresses the tap
+  // (and thus any row action) via the flag checked on the click that follows.
+  let timer = null, fired = false;
+  const start = () => { fired = false; timer = setTimeout(() => { timer = null; fired = true; playerModal(pid); }, 450); };
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  node.addEventListener('touchstart', start, { passive: true });
+  node.addEventListener('touchend', cancel);
+  node.addEventListener('touchmove', cancel);
+  node.addEventListener('click', (e) => { if (fired) { e.preventDefault(); e.stopPropagation(); fired = false; } });
+  return node;
 }
 export { el, esc };
