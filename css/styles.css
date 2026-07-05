@@ -1,0 +1,123 @@
+/* =============================================================================
+   1-bit theme: white text on black, monospaced, square white borders.
+   Mobile-first, fluid typography, touch targets >= 44px, no hover reliance.
+   ============================================================================= */
+:root {
+  --fg: #ffffff;
+  --bg: #000000;
+  --dim: #b8b8b8;          /* slightly dimmed text (still 1-bit-ish) */
+  --border: #ffffff;
+  --tap: 44px;             /* minimum touch target */
+  --gap: 0.6rem;
+  --font: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", "Liberation Mono", monospace;
+  --fs: clamp(14px, 3.6vw, 18px);
+  --fs-sm: clamp(12px, 3vw, 15px);
+  --fs-lg: clamp(20px, 6vw, 34px);
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font); font-size: var(--fs);
+  line-height: 1.4;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+#app { max-width: 900px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+.hidden { display: none !important; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* ---- Top bar --------------------------------------------------------------*/
+.topbar {
+  display: flex; align-items: center; gap: var(--gap);
+  border-bottom: 2px solid var(--border);
+  padding: 0.4rem 0.6rem; position: sticky; top: 0; background: var(--bg); z-index: 10;
+}
+.status-line { font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---- Screen ---------------------------------------------------------------*/
+.screen { flex: 1; padding: 0.8rem 0.6rem 3rem; width: 100%; }
+h1, h2, h3 { font-weight: 700; margin: 0 0 0.6rem; letter-spacing: 0.04em; }
+h1 { font-size: var(--fs-lg); text-transform: uppercase; }
+h2 { font-size: clamp(16px, 4.5vw, 22px); text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+p { margin: 0.3rem 0; }
+a { color: var(--fg); }
+.dim { color: var(--dim); }
+.center { text-align: center; }
+
+/* ---- Buttons / tap targets ------------------------------------------------*/
+button, .btn {
+  font-family: inherit; font-size: var(--fs);
+  color: var(--fg); background: var(--bg);
+  border: 2px solid var(--border); border-radius: 0;
+  min-height: var(--tap); min-width: var(--tap);
+  padding: 0.5rem 0.8rem; margin: 0; cursor: pointer;
+  text-align: left; width: 100%; display: block; text-transform: uppercase;
+  letter-spacing: 0.03em; -webkit-tap-highlight-color: transparent;
+}
+button:active, .btn:active { background: var(--fg); color: var(--bg); }
+button:disabled { opacity: 0.4; }
+button.inline, .btn.inline { width: auto; display: inline-block; }
+button.selected { background: var(--fg); color: var(--bg); }
+.btn-row { display: flex; flex-wrap: wrap; gap: var(--gap); margin: var(--gap) 0; }
+.btn-row > button, .btn-row > .btn { width: auto; flex: 1 1 auto; }
+.nav-toggle { width: auto; padding: 0.4rem 0.6rem; }
+
+/* ---- Menu list ------------------------------------------------------------*/
+.menu-list button { margin-bottom: var(--gap); }
+.badge { border: 1px solid var(--border); padding: 0 0.35em; margin-left: 0.4em; font-size: var(--fs-sm); }
+
+/* ---- Tables (rendered as bordered blocks; horizontal scroll on phone) -----*/
+.table-wrap { width: 100%; overflow-x: auto; border: 2px solid var(--border); margin: var(--gap) 0; }
+table { border-collapse: collapse; width: 100%; font-size: var(--fs-sm); white-space: nowrap; }
+th, td { border: 1px solid var(--border); padding: 0.35rem 0.5rem; text-align: right; }
+th:first-child, td:first-child { text-align: left; }
+th { text-transform: uppercase; }
+tr.clickable { cursor: pointer; }
+tr.clickable:active td { background: var(--fg); color: var(--bg); }
+tr.me td { border-top: 2px solid var(--fg); border-bottom: 2px solid var(--fg); font-weight: 700; }
+th.sortable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+th.sortable:active { background: var(--fg); color: var(--bg); }
+th.sorted { text-decoration: underline; }
+.sort-ind { font-size: var(--fs-sm); }
+
+/* ---- Panels / cards -------------------------------------------------------*/
+.panel { border: 2px solid var(--border); padding: 0.6rem; margin: var(--gap) 0; }
+.row { display: flex; justify-content: space-between; gap: var(--gap); align-items: center; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+hr { border: none; border-top: 1px solid var(--border); margin: var(--gap) 0; }
+
+/* ---- Inputs ---------------------------------------------------------------*/
+input[type="text"], input[type="number"], select {
+  font-family: inherit; font-size: var(--fs);
+  color: var(--fg); background: var(--bg);
+  border: 2px solid var(--border); border-radius: 0;
+  min-height: var(--tap); padding: 0.4rem 0.5rem; width: 100%;
+}
+label { display: block; font-size: var(--fs-sm); margin-bottom: 0.2rem; }
+
+/* ---- Nav drawer -----------------------------------------------------------*/
+.nav-drawer {
+  position: fixed; top: 0; left: 0; bottom: 0; width: min(80vw, 320px);
+  background: var(--bg); border-right: 2px solid var(--border);
+  padding: 0.8rem 0.6rem; z-index: 30; overflow-y: auto;
+}
+.nav-drawer button { margin-bottom: var(--gap); }
+.nav-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 20; }
+
+/* ---- Modal ----------------------------------------------------------------*/
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 40; display: flex; align-items: center; justify-content: center; padding: 0.8rem; }
+.modal-body { border: 2px solid var(--border); background: var(--bg); padding: 0.8rem; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+
+/* ---- Toast ----------------------------------------------------------------*/
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 1.2rem; border: 2px solid var(--border); background: var(--bg); padding: 0.5rem 0.8rem; z-index: 50; font-size: var(--fs-sm); max-width: 90vw; }
+
+/* ---- Utility --------------------------------------------------------------*/
+.mono-box { border: 2px solid var(--border); padding: 0.6rem; white-space: pre; overflow-x: auto; font-size: var(--fs-sm); }
+.pos-tag { border: 1px solid var(--border); padding: 0 0.3em; font-size: var(--fs-sm); }
+.small { font-size: var(--fs-sm); }
+ul.plain { list-style: none; padding: 0; margin: 0; }
+.spread { display: flex; justify-content: space-between; gap: var(--gap); }
