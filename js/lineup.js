@@ -27,11 +27,11 @@ export function injuryReturnInfo(game, p) {
   return { games, type: p.injury.type, date: ret ? ret.date : null };
 }
 
-// Short human label for an injured player, e.g. "OUT ~5g (est. 2025-01-12)".
+// Short human label for an injured player, e.g. "OUT ~5games (est. 2025-01-12)".
 export function injuryLabel(game, p) {
   const info = injuryReturnInfo(game, p);
   if (!info) return '';
-  return `OUT ~${info.games}g${info.date ? ` (est. ${info.date})` : ''}`;
+  return `OUT ~${info.games}games${info.date ? ` (est. ${info.date})` : ''}`;
 }
 
 // Marker prefix used to flag injured players in lists ("+ " before the name).

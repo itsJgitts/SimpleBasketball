@@ -94,8 +94,17 @@ function teamAssets(g, tid, wrap) {
   // Draft picks stay as toggle buttons (few, and not tabular).
   picksOwnedBy(g, tid).forEach((dp) => {
     const sel = state.selected.has(assetKey('pick', dp.dpid));
-    wrap.append(btn(`${sel ? '✓ ' : ''}${dp.season} R${dp.round} pick`, () => assetToggle('pick', dp.dpid), { class: sel ? 'selected' : '' }));
+    wrap.append(btn(`${sel ? '✓ ' : ''}${pickLabel(g, dp)}`, () => assetToggle('pick', dp.dpid), { class: sel ? 'selected' : '' }));
   });
+}
+
+// A label for a draft pick, noting the original team when it isn't the current
+// owner's own pick (e.g. "2027 R1 pick (from CLE)").
+function pickLabel(g, dp) {
+  const base = `${dp.season} R${dp.round} pick`;
+  if (dp.originalTid == null || dp.originalTid === dp.tid) return base;
+  const orig = teamById(g, dp.originalTid);
+  return orig ? `${base} (from ${orig.abbrev})` : base;
 }
 
 // A human label for a selected asset key (player name or pick description).
@@ -104,7 +113,7 @@ function assetLabel(g, key) {
   const id = Number(idStr);
   if (kind === 'player') { const p = g.players.find((x) => x.pid === id); return p ? p.name : '?'; }
   const dp = g.draftPicks.find((d) => d.dpid === id);
-  return dp ? `${dp.season} R${dp.round} pick` : '?';
+  return dp ? pickLabel(g, dp) : '?';
 }
 
 // Whether a player asset is being routed to `tid` (picks never affect rosters).

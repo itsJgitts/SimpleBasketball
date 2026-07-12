@@ -27,7 +27,7 @@ function sim(fn) {
 // Human line for a single user rotation event.
 function eventLine(e) {
   return e.kind === 'injury'
-    ? `${e.name} injured (${e.type}${e.games ? ` ~${e.games}g` : ''}).`
+    ? `${e.name} injured (${e.type}${e.games ? ` ~${e.games}games` : ''}).`
     : `${e.name} returns from injury.`;
 }
 
