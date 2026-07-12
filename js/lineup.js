@@ -14,6 +14,38 @@ export function isHealthy(p) {
   return !p.injury || p.injury.gamesRemaining <= 0 || p.injury.type === 'Healthy';
 }
 
+// Estimated return for an injured player: games remaining plus, if the schedule
+// is available, the date of the game they should be back for. Returns null when
+// the player is healthy. `games` counts the player's own team's games missed.
+export function injuryReturnInfo(game, p) {
+  if (isHealthy(p)) return null;
+  const games = p.injury.gamesRemaining;
+  const upcoming = (game && game.schedule ? game.schedule : [])
+    .filter((gm) => !gm.played && (gm.home === p.tid || gm.away === p.tid))
+    .sort((a, b) => a.day - b.day);
+  const ret = upcoming[games]; // they sit `games` games, return for the next
+  return { games, type: p.injury.type, date: ret ? ret.date : null };
+}
+
+// Short human label for an injured player, e.g. "OUT ~5g (est. 2025-01-12)".
+export function injuryLabel(game, p) {
+  const info = injuryReturnInfo(game, p);
+  if (!info) return '';
+  return `OUT ~${info.games}g${info.date ? ` (est. ${info.date})` : ''}`;
+}
+
+// Marker prefix used to flag injured players in lists ("+ " before the name).
+export function injuryMark(p) { return isHealthy(p) ? '' : '+ '; }
+
+// Is `p` a rotation-caliber player on their team (top ROTATION_SIZE by ovr)?
+// Used to decide which injury/return events are worth pausing the sim for.
+export function isRotationCaliber(game, p) {
+  if (!p || p.tid < 0) return false;
+  const roster = game.players.filter((x) => x.tid === p.tid).sort((a, b) => b.ovr - a.ovr);
+  const idx = roster.findIndex((x) => x.pid === p.pid);
+  return idx >= 0 && idx < CONFIG.ROTATION_SIZE;
+}
+
 // Distribute `total` minutes across ranked pids, weighted by weight[pid],
 // capped at maxEach per player, returning integer minutes that sum to `total`.
 function distributeMinutes(pids, weights, total, maxEach) {
@@ -126,29 +158,43 @@ export function moveBench(lineup, pid, dir) {
   return lineup;
 }
 
-// Set one player's minutes and rebalance the remaining rotation players so the
-// team total stays exactly TOTAL_TEAM_MINUTES (240). Players at 0 stay at 0.
+// Set one player's minutes WITHOUT touching anyone else. The remaining pool
+// (240 - assigned) is left for the user to allocate manually; the UI surfaces
+// it. Callers can use applyRemainingMinutes() to auto-balance when they choose.
 export function setMinutes(lineup, pid, value) {
   const mins = lineup.minutes;
   if (mins[pid] === undefined) throw new Error('Player not in lineup.');
-  const target = CONFIG.TOTAL_TEAM_MINUTES;
   mins[pid] = clamp(Math.round(value), 0, CONFIG.MINUTES_PER_GAME);
-  // Rebalance the *other* rotation players (those with minutes) proportionally.
-  const others = Object.keys(mins).filter((k) => Number(k) !== pid && mins[k] > 0);
-  let remaining = target - mins[pid];
-  const otherTotal = others.reduce((s, k) => s + mins[k], 0) || 1;
+  return lineup;
+}
+
+// Minutes still unassigned (can be negative if the team is over 240).
+export function remainingMinutes(lineup) {
+  return CONFIG.TOTAL_TEAM_MINUTES - totalMinutes(lineup);
+}
+
+// Auto-balance the current rotation to sum exactly TOTAL_TEAM_MINUTES, keeping
+// each player's minutes in proportion to their current share (players at 0 stay
+// at 0). Used by the "Apply Remaining Minutes" button. Mutates and returns the
+// lineup. If no one has minutes, minutes are left untouched.
+export function applyRemainingMinutes(lineup) {
+  const mins = lineup.minutes;
+  const target = CONFIG.TOTAL_TEAM_MINUTES;
+  const players = Object.keys(mins).filter((k) => mins[k] > 0);
+  const current = players.reduce((s, k) => s + mins[k], 0);
+  if (!players.length || current === 0) return lineup;
   let assigned = 0;
-  others.forEach((k) => { mins[k] = clamp(Math.round(mins[k] / otherTotal * remaining), 0, CONFIG.MINUTES_PER_GAME); assigned += mins[k]; });
-  // Fix drift on the others so the grand total is exactly `target`.
-  let diff = remaining - assigned;
+  players.forEach((k) => { mins[k] = clamp(Math.round(mins[k] / current * target), 0, CONFIG.MINUTES_PER_GAME); assigned += mins[k]; });
+  // Fix rounding drift so the grand total is exactly `target`.
+  let diff = target - assigned;
   let i = 0;
-  while (diff !== 0 && others.length) {
-    const k = others[i % others.length];
+  while (diff !== 0 && players.length) {
+    const k = players[i % players.length];
     const step = diff > 0 ? 1 : -1;
     const nv = mins[k] + step;
     if (nv >= 0 && nv <= CONFIG.MINUTES_PER_GAME) { mins[k] = nv; diff -= step; }
     i++;
-    if (i > others.length * (CONFIG.MINUTES_PER_GAME + 2)) break;
+    if (i > players.length * (CONFIG.MINUTES_PER_GAME + 2)) break;
   }
   return lineup;
 }

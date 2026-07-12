@@ -8,6 +8,7 @@
 import CONFIG from './config.js';
 import { simGame } from './sim.js';
 import { processTeamInjuries } from './progression.js';
+import { isRotationCaliber } from './lineup.js';
 
 // Fast lookups rebuilt per call (teams/players may change via trades/signings).
 function indexGame(game) {
@@ -41,23 +42,29 @@ function accumulateBox(box, playersById, season) {
 }
 
 // Recover one game off active injuries for every player on a team that played.
+// Returns the list of players who became healthy this game (for event reports).
 function recoverTeam(team, playersById) {
+  const recovered = [];
   for (const pid of Object.keys(team.lineup.minutes || {})) {
     const p = playersById[pid];
     if (p && p.injury && p.injury.gamesRemaining > 0) {
       p.injury.gamesRemaining -= 1;
-      if (p.injury.gamesRemaining <= 0) p.injury = { type: 'Healthy', gamesRemaining: 0 };
+      if (p.injury.gamesRemaining <= 0) {
+        p.injury = { type: 'Healthy', gamesRemaining: 0 };
+        recovered.push({ pid: p.pid, name: p.name, tid: team.tid });
+      }
     }
   }
+  return recovered;
 }
 
 // Simulate every unplayed regular-season game scheduled on `day`.
-// Returns { results: [...], injuries: [...] } for that day.
+// Returns { results, injuries, recoveries } for that day.
 export function simDay(game, day, ctx = indexGame(game)) {
   const { teamsById, playersById } = ctx;
   const R = game.__R; // rng helpers bound by the caller (see runToDay)
   const todays = game.schedule.filter((gm) => gm.day === day && !gm.played);
-  const results = [], injuries = [];
+  const results = [], injuries = [], recoveries = [];
   for (const gm of todays) {
     const res = simGame(gm, teamsById, playersById, R);
     game.results[res.gid] = res;
@@ -69,10 +76,27 @@ export function simDay(game, day, ctx = indexGame(game)) {
     const home = teamsById[gm.home], away = teamsById[gm.away];
     processTeamInjuries(home, playersById, R).forEach((i) => injuries.push({ ...i, tid: home.tid }));
     processTeamInjuries(away, playersById, R).forEach((i) => injuries.push({ ...i, tid: away.tid }));
-    recoverTeam(home, playersById);
-    recoverTeam(away, playersById);
+    recoverTeam(home, playersById).forEach((r) => recoveries.push(r));
+    recoverTeam(away, playersById).forEach((r) => recoveries.push(r));
   }
-  return { results, injuries };
+  return { results, injuries, recoveries };
+}
+
+// Collect the user team's rotation-relevant events from a day's sim result:
+// new injuries to user players (which only happen to players who played) and
+// returns of rotation-caliber user players. Used to pause a multi-day sim.
+function userEvents(game, dayRes) {
+  const events = [];
+  for (const inj of dayRes.injuries) {
+    if (inj.tid !== game.userTid) continue;
+    events.push({ kind: 'injury', pid: inj.pid, name: inj.name, type: inj.type, games: inj.games });
+  }
+  for (const rec of dayRes.recoveries) {
+    if (rec.tid !== game.userTid) continue;
+    const p = game.players.find((x) => x.pid === rec.pid);
+    if (p && isRotationCaliber(game, p)) events.push({ kind: 'return', pid: rec.pid, name: rec.name });
+  }
+  return events;
 }
 
 // Has the entire regular season been played?
@@ -136,4 +160,32 @@ export function advanceToDeadline(game, R) {
 // Simulate the remainder of the regular season.
 export function advanceToSeasonEnd(game, R) {
   return advanceUntil(game, R, null);
+}
+
+// ---- Event-driven advance (pause on user rotation injuries/returns) ---------
+// Advance the calendar one day at a time until the season ends, `stop(game,day)`
+// returns true, or a day produces user rotation events (injury to a user player,
+// or the return of a rotation-caliber user player). When events occur, that day
+// is fully simulated and the loop returns control so the UI can react.
+// Returns { daysAdvanced, results, injuries, recoveries, events, done }, where
+// `done` is true when there is nothing left to simulate (season complete or the
+// stop condition was reached with no pending events). Callers re-invoke to
+// continue after handling the events.
+export function advanceWithEvents(game, R, stop) {
+  game.__R = R;
+  const ctx = indexGame(game);
+  const agg = { daysAdvanced: 0, results: [], injuries: [], recoveries: [], events: [], done: false };
+  while (!regularSeasonComplete(game) && game.day < game.numDays) {
+    if (stop && stop(game, game.day)) { agg.done = true; break; }
+    const d = simDay(game, game.day, ctx);
+    agg.results.push(...d.results);
+    agg.injuries.push(...d.injuries);
+    agg.recoveries.push(...d.recoveries);
+    agg.daysAdvanced += 1; game.day += 1;
+    const events = userEvents(game, d);
+    if (events.length) { agg.events = events; break; }
+  }
+  if (regularSeasonComplete(game) || game.day >= game.numDays) agg.done = true;
+  delete game.__R;
+  return agg;
 }

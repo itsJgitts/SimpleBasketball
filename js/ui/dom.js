@@ -16,6 +16,12 @@ export function registerScreen(name, def) { SCREENS[name] = def; }
 export function navigate(name, params = {}) {
   const def = SCREENS[name];
   if (!def) { console.error('no screen', name); return; }
+  // Let the outgoing screen tear down transient state (e.g. clear a half-built
+  // trade) before we render the next one.
+  if (current && current !== name) {
+    const prev = SCREENS[current];
+    if (prev && typeof prev.onLeave === 'function') prev.onLeave(name);
+  }
   current = name;
   const host = $('#screen');
   host.innerHTML = '';
@@ -33,6 +39,7 @@ export function currentScreen() { return current; }
 const NAV_ITEMS = [
   ['home', 'Dashboard'], ['standings', 'Standings'], ['schedule', 'Schedule'],
   ['roster', 'Roster / Lineup'], ['trade', 'Trade'], ['freeagency', 'Free Agency'],
+  ['extensions', 'Extensions'],
 ];
 
 export function refreshTopbar() {
@@ -160,6 +167,12 @@ export function table(headers, rows, { rowMeta, onRow, sortable, sortKeys } = {}
   renderBody();
   const thead = el('thead', {}, el('tr', {}, ...ths));
   return el('div', { class: 'table-wrap' }, el('table', {}, thead, tbody));
+}
+
+// Marker prefix for a player who is currently injured (used in name cells so
+// injured players stand out in lists). Healthy players get an empty string.
+export function injMark(p) {
+  return (p && p.injury && p.injury.gamesRemaining > 0 && p.injury.type !== 'Healthy') ? '+ ' : '';
 }
 
 export function panel(...children) { return el('div', { class: 'panel' }, ...children); }

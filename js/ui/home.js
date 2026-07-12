@@ -7,11 +7,12 @@
 import { el, money } from '../util.js';
 import { store, saveToLocal, userTeam, playersOnTeam } from '../state.js';
 import {
-  advanceToNextUserGame, advanceDays, advanceToDeadline, advanceToSeasonEnd,
-  regularSeasonComplete, nextUserGameDay,
+  advanceToNextUserGame, advanceDays, advanceToDeadline,
+  advanceWithEvents, regularSeasonComplete, nextUserGameDay,
 } from '../engine.js';
+import { autoLineup } from '../lineup.js';
 import { computeStandings } from '../standings.js';
-import { registerScreen, navigate, reRender, toast, h2, btn, btnRow, table, panel } from './dom.js';
+import { registerScreen, navigate, reRender, toast, h2, btn, btnRow, table, panel, openModal, closeModal, confirmModal } from './dom.js';
 
 function sim(fn) {
   const g = store.game;
@@ -21,6 +22,48 @@ function sim(fn) {
   toast(`Simmed ${agg.daysAdvanced} day(s), ${agg.results.length} games${inj}.`);
   if (regularSeasonComplete(g) && g.phase === 'regular') g.phase = 'regularDone';
   reRender();
+}
+
+// Human line for a single user rotation event.
+function eventLine(e) {
+  return e.kind === 'injury'
+    ? `${e.name} injured (${e.type}${e.games ? ` ~${e.games}g` : ''}).`
+    : `${e.name} returns from injury.`;
+}
+
+// Event-driven "Sim to Season End": advance until the season ends or a user
+// rotation player is injured / returns, then pause with a modal so the user can
+// auto-adjust minutes, jump to the lineup screen, or keep simming.
+function simSeasonWithEvents() {
+  const g = store.game;
+  const step = () => {
+    const agg = advanceWithEvents(g, store.R, null);
+    saveToLocal();
+    if (regularSeasonComplete(g) && g.phase === 'regular') g.phase = 'regularDone';
+    if (agg.events && agg.events.length) {
+      const box = el('div', {}, el('h3', { text: 'Roster Update' }),
+        el('div', { class: 'mono-box', text: agg.events.map(eventLine).join('\n') }),
+        btnRow(
+          btn('Auto-adjust Minutes', () => {
+            const team = userTeam();
+            team.lineup = autoLineup(playersOnTeam(g.userTid), g.season);
+            saveToLocal(); closeModal(); step();
+          }),
+          btn('Set Lineup', () => { closeModal(); reRender(); navigate('roster'); }),
+          btn('Continue', () => { closeModal(); step(); }),
+        ));
+      openModal(box);
+      return;
+    }
+    reRender();
+    toast('Season simmed to completion.');
+  };
+  step();
+}
+
+async function confirmSimSeason() {
+  const ok = await confirmModal('Sim the rest of the regular season? You will be paused for injuries and returns to your rotation.', { okText: 'Sim Season' });
+  if (ok) simSeasonWithEvents();
 }
 
 function userResults(g, n) {
@@ -76,7 +119,7 @@ registerScreen('home', {
         btn('Sim Month', () => sim((game, R) => advanceDays(game, R, 30))),
         btn('Sim to Deadline', () => sim(advanceToDeadline)),
       ));
-      wrap.append(btn('Sim to Season End', () => sim(advanceToSeasonEnd)));
+      wrap.append(btn('Sim to Season End', confirmSimSeason));
     }
 
     // Recent results.

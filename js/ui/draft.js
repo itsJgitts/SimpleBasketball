@@ -10,7 +10,7 @@ import {
   setupDraft, availableProspects, currentPick, makePick, autoDraftUntil, autoPick,
 } from '../draft.js';
 import { startNextSeason, playoffTids } from '../season.js';
-import { registerScreen, navigate, reRender, toast, h2, table, btn, btnRow, panel, playerName } from './dom.js';
+import { registerScreen, navigate, reRender, toast, h2, table, btn, btnRow, panel, playerName, confirmModal } from './dom.js';
 
 function coinFn(a, b) { return ((a.tid + b.tid) % 2 === 0) ? -1 : 1; }
 const teamById = (g, tid) => g.teams.find((t) => t.tid === tid);
@@ -88,7 +88,11 @@ registerScreen('draft', {
         saveToLocal();
         reRender();
       }),
-      btn('Sim Entire Draft', () => { autoDraftUntil(g); saveToLocal(); reRender(); }),
+      btn('Sim Entire Draft', async () => {
+        const ok = await confirmModal('Sim the entire draft? All remaining picks will be made automatically.', { okText: 'Sim Draft' });
+        if (!ok) return;
+        autoDraftUntil(g); saveToLocal(); reRender();
+      }),
     ));
     return wrap;
   },

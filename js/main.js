@@ -15,6 +15,7 @@ import './ui/schedule.js';
 import './ui/lineup.js';
 import './ui/trade.js';
 import './ui/freeagency.js';
+import './ui/extensions.js';
 import './ui/playoffs.js';
 import './ui/draft.js';
 

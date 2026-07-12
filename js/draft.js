@@ -181,7 +181,14 @@ export function makePick(game, pid) {
   game.draftClass.picks.push({ overall: slot.overall, round: slot.round, pick: slot.pick, tid: slot.tid, pid });
   game.draftClass.onClock += 1;
   game.transactions.push({ type: 'draft', day: game.day, season: game.season, tid: slot.tid, pid, round: slot.round, pick: slot.pick });
-  if (game.draftClass.onClock >= game.draftClass.order.length) game.phase = 'offseason';
+  if (game.draftClass.onClock >= game.draftClass.order.length) {
+    game.phase = 'offseason';
+    // The draft is over: this season's picks have been spent, so drop them from
+    // the tradeable pool (only future picks remain to be traded).
+    if (Array.isArray(game.draftPicks)) {
+      game.draftPicks = game.draftPicks.filter((dp) => dp.season > game.season);
+    }
+  }
   return player;
 }
 

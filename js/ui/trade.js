@@ -7,8 +7,9 @@
 import CONFIG from '../config.js';
 import { el, money } from '../util.js';
 import { store, saveToLocal } from '../state.js';
+import { isHealthy } from '../lineup.js';
 import { validateTrade, aiEvaluateAll, executeTrade, playersOnTeam, picksOwnedBy, teamPayroll, teamSummary, salaryMatchOk } from '../trade.js';
-import { registerScreen, navigate, reRender, toast, h2, table, btn, btnRow, panel, playerName } from './dom.js';
+import { registerScreen, navigate, reRender, toast, h2, table, btn, btnRow, panel, playerName, injMark } from './dom.js';
 
 // Trade being assembled: teams (first = user), a Set of selected asset keys, a
 // map of asset key -> chosen destination tid (3-team routing), and the last AI
@@ -81,13 +82,13 @@ function teamAssets(g, tid, wrap) {
   const players = playersOnTeam(g, tid).slice().sort((a, b) => b.ovr - a.ovr);
   const rows = players.map((p) => {
     const sel = state.selected.has(assetKey('player', p.pid));
-    return [playerName(p.pid, `${sel ? '✓ ' : ''}${p.name}`), p.pos, p.ovr, money(p.contract.amount)];
+    return [playerName(p.pid, `${sel ? '✓ ' : ''}${injMark(p)}${p.name}`), p.pos, p.ovr, money(p.contract.amount), isHealthy(p) ? '' : 'INJ'];
   });
-  wrap.append(table(['Player', 'Pos', 'Ovr', 'Salary'], rows, {
+  wrap.append(table(['Player', 'Pos', 'Ovr', 'Salary', ''], rows, {
     onRow: (i) => assetToggle('player', players[i].pid),
     rowMeta: (i) => (state.selected.has(assetKey('player', players[i].pid)) ? 'me' : ''),
     sortable: true,
-    sortKeys: [null, null, null, (_, i) => players[i].contract.amount],
+    sortKeys: [null, null, null, (_, i) => players[i].contract.amount, null],
   }));
 
   // Draft picks stay as toggle buttons (few, and not tabular).
@@ -175,7 +176,28 @@ function playerName2(g, key) {
   return el('span', { text: assetLabel(g, key) });
 }
 
+// A plain-text summary of the proposed trade: for each team in the deal, the
+// assets it gives up and the assets it receives. Returns a mono-box node, or
+// null when nothing is selected yet.
+function tradeSummary(g) {
+  const trade = buildTrade(g);
+  if (!trade.assets.length) return null;
+  const teams = [g.userTid, ...state.partners];
+  const lines = [];
+  for (const tid of teams) {
+    const t = teamById(g, tid);
+    const gives = trade.assets.filter((a) => a.from === tid).map((a) => assetLabel(g, assetKey(a.kind, a.id)));
+    const gets = trade.assets.filter((a) => a.to === tid).map((a) => assetLabel(g, assetKey(a.kind, a.id)));
+    lines.push(`${t.abbrev}`);
+    lines.push(`  gives:    ${gives.length ? gives.join(', ') : '—'}`);
+    lines.push(`  receives: ${gets.length ? gets.join(', ') : '—'}`);
+  }
+  return el('div', { class: 'mono-box', text: lines.join('\n') });
+}
+
 registerScreen('trade', {
+  // Discard any half-built trade when leaving so it doesn't linger on return.
+  onLeave() { resetTrade(); },
   render() {
     const g = store.game;
     if (!g) { navigate('menu'); return el('div'); }
@@ -225,6 +247,9 @@ registerScreen('trade', {
     const trade = buildTrade(g);
     const check = validateTrade(g, trade);
     const verdictBox = el('div', {});
+    // Human-readable summary of who sends/receives what.
+    const summary = tradeSummary(g);
+    if (summary) { verdictBox.append(el('h3', { text: 'Trade Summary' })); verdictBox.append(summary); }
     if (!check.ok) {
       verdictBox.append(el('p', { class: 'dim', text: check.errors[0] }));
     } else {

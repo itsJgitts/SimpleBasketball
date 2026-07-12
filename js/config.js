@@ -84,6 +84,12 @@ export const CONFIG = {
   CONTRACT_WILLINGNESS_DISCOUNT: 0.15, // base random willingness spread (+/-)
   CONTRACT_MAX_GOOD_TEAM_DISCOUNT: 0.20, // best team => asks up to 20% less
   EXTENSION_WINDOW_YEARS: 1, // players in final `n` years of deal are extension-eligible
+  // User contract offers (signings + extensions): accept when the total offered
+  // value (amount x years) is at least this fraction of the total demanded value.
+  CONTRACT_ACCEPT_RATIO: 0.90,
+  // Restricted free agents: to pry an RFA off another team, the offer's total
+  // value must beat the demand by this premium (otherwise the team "matches").
+  RFA_OFFER_PREMIUM: 1.10,
 
   // ---- Trade logic ----------------------------------------------------------
   TRADE_SALARY_MATCH_PCT: 1.25,     // outgoing salary must be within 125% ...

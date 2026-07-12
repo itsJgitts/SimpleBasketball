@@ -154,3 +154,54 @@ export function rankedFreeAgents(game) {
     .map((p) => { refreshPlayer(p, game.season); return p; })
     .sort((a, b) => b.ovr - a.ovr);
 }
+
+// ---- User offers (custom salary/years) -------------------------------------
+// Decide whether a user contract offer { amount, years } is accepted versus a
+// computed demand. Uses a total-value ratio (amount x years) so lowball offers
+// are rejected. Returns { accept, ratio }.
+export function offerAccepted(offer, demand, minRatio = CONFIG.CONTRACT_ACCEPT_RATIO) {
+  const off = (offer.amount || 0) * (offer.years || 0);
+  const dem = (demand.amount || 0) * (demand.years || 0);
+  const ratio = dem <= 0 ? (off > 0 ? Infinity : 1) : off / dem;
+  return { accept: ratio >= minRatio, ratio };
+}
+
+// ---- Restricted free agents (other teams' expiring players) ----------------
+// Players on *other* teams whose deal is in its final window: they can be given
+// an offer sheet. `excludeTid` (the user team) is filtered out.
+export function restrictedFreeAgents(game, excludeTid) {
+  return game.players
+    .filter((p) => p.tid >= 0 && p.tid !== excludeTid && isExtensionEligible(game, p))
+    .map((p) => { refreshPlayer(p, game.season); return p; })
+    .sort((a, b) => b.ovr - a.ovr);
+}
+
+// An RFA offer must beat the player's demand by the RFA premium, otherwise the
+// current team matches the sheet (the offer is effectively rejected).
+export function rfaOfferAccepted(offer, demand) {
+  return offerAccepted(offer, demand, CONFIG.RFA_OFFER_PREMIUM);
+}
+
+// Sign a restricted free agent away from their current team onto `tid`. Moves
+// the player, applies the (accepted) contract, rebuilds both lineups and logs
+// the transaction. Throws if the player is a free agent or the roster is full.
+export function signRestrictedFreeAgent(game, pid, tid, contract) {
+  const player = game.players.find((p) => p.pid === pid);
+  if (!player) throw new Error('Unknown player.');
+  if (player.tid < 0) throw new Error(`${player.name} is not on another team.`);
+  if (player.tid === tid) throw new Error(`${player.name} is already on your team.`);
+  if (!canAddPlayer(game, tid)) throw new Error(`Roster is full (max ${CONFIG.ROSTER_MAX}).`);
+  const oldTid = player.tid;
+  const deal = contract || contractDemand(game, player, tid);
+  player.tid = tid;
+  player.contract = { amount: deal.amount, exp: deal.exp };
+  const newTeam = teamById(game, tid);
+  const oldTeam = teamById(game, oldTid);
+  if (newTeam) newTeam.lineup = autoLineup(playersOnTeam(game, tid), game.season);
+  if (oldTeam) oldTeam.lineup = autoLineup(playersOnTeam(game, oldTid), game.season);
+  game.transactions.push({
+    type: 'signRFA', day: game.day, season: game.season,
+    tid, fromTid: oldTid, pid, amount: deal.amount, exp: deal.exp,
+  });
+  return player;
+}
